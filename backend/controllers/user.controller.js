@@ -1,42 +1,36 @@
 const userService = require("../services/user.service");
 
-async function criar(req, res) {
+async function criar(req, res, next) {
     try {
         const resultado = await userService.criar(req.body);
 
         res.status(201).json(resultado);
     } catch (error) {
-        res.status(error.statusCode || 500).json({
-            message: error.message
-        });
+        next(error);
     };
 }
 
-async function listar(_req, res) {
+async function listar(_req, res, next) {
     try {
         const resultado = await userService.listar();
 
         res.status(200).json(resultado);
     } catch (error) {
-        res.status(error.statusCode || 500).json({
-            message: error.message
-        });
+        next(error);
     };
 }
 
-async function buscarPorId(req, res) {
+async function buscarPorId(req, res, next) {
     try {
         const resultado = await userService.buscarPorId(req.params.id);
 
         res.status(200).json(resultado);
     } catch (error) {
-        res.status(error.statusCode || 500).json({
-            message: error.message
-        });
+        next(error);
     };
 }
 
-async function atualizar(req, res) {
+async function atualizar(req, res, next) {
     try {
         const resultado = await userService.atualizar(
             req.params.id,
@@ -45,21 +39,27 @@ async function atualizar(req, res) {
 
         res.status(200).json(resultado);
     } catch (error) {
-        res.status(error.statusCode || 500).json({
-            message: error.message
-        });
+        next(error);;
     };
 }
 
-async function deletar(req, res) {
+async function deletar(req, res, next) {
     try {
         const resultado = await userService.deletar(req.params.id);
 
         res.status(204).send();
     } catch (error) {
-        res.status(error.statusCode || 500).json({
-            message: error.message
-        });
+        next(error);
+    };
+}
+
+async function login(req, res, next) {
+    try {
+        const resultado = await userService.login(req.body);
+
+        res.status(200).json(resultado);
+    } catch (error) {
+        next(error);
     };
 }
 
@@ -68,5 +68,6 @@ module.exports = {
     listar,
     buscarPorId,
     atualizar,
-    deletar
+    deletar,
+    login
 };

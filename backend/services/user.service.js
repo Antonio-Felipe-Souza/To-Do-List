@@ -1,29 +1,28 @@
 const userRepository = require("../repositories/user.repository")
 const AppError = require("../errors/AppError");
+const userCreateSchema = require("../schemas/user.creat.schema");
+const userUpdateSchema = require("../schemas/user.update.schema");
+const bcrypt = require("bcrypt");
+const userLoginSchema = require("../schemas/user.login.schema");
+const jwt = require("jsonwebtoken");
+const { email } = require("zod");
 
 async function criar(dados) {
-    validarDados(dados)
-    console.log("Dados que chegaram no service", dados);
+    const dadosValidadosZod = userCreateSchema.parse(dados);
 
-    const usuarioExistente = await userRepository.buscarPorEmail(dados.email);
+    const usuarioExistente = await userRepository.buscarPorEmail(dadosValidadosZod.email);
     if (usuarioExistente) throw new AppError("Email já cadastrado", 409);
 
-    const usuario = await userRepository.criar(dados);
+    const senhaHash = await bcrypt.hash(dadosValidadosZod.senha, 10);
+
+    const dadosUsuario = {
+        ...dadosValidadosZod,
+        senha: senhaHash
+    };
+
+    const usuario = await userRepository.criar(dadosUsuario);
 
     return usuario;
-}
-
-function validarDados(dados) {
-    const { nome, email, senha } = dados;
-    const regexNome = /^[a-zA-ZÀ-ÿ\s]+$/;
-    const regexEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-    if (!nome) throw new AppError("Nome é obrigatório", 400);
-    if (nome.trim().length < 3) throw new AppError("Nome deve ter no mínimo 3 caracteres válidos", 400);
-    if (!regexNome.test(nome.trim())) throw new AppError("Nome de usuário contém caracteres inválidos", 400);
-    if (!email) throw new AppError("Email é obrigatório", 400);
-    if (!regexEmail.test(email.trim())) throw new AppError("Email inválido", 400);
-    if (!senha) throw new AppError("Senha é obrigatória", 400);
 }
 
 async function listar() {
@@ -41,13 +40,24 @@ async function buscarPorId(id) {
 }
 
 async function atualizar(id, dados) {
-    validarDados(dados)
+    const dadosValidadosZod = userUpdateSchema.parse(dados);
 
     const usuario = await buscarPorId(id);
-        
-    const usuarioAtualizado = await userRepository.atualizar(id,dados);
 
-    return usuarioAtualizado;
+    const dadosUsuario = {
+        ...dadosValidadosZod
+    };
+
+    if (dadosUsuario.senha !== undefined) {
+        dadosUsuario.senha = await bcrypt.hash(dadosUsuario.senha, 10);
+    };
+
+    const usuarioAtualizado = await userRepository.atualizar(id, dadosUsuario);
+
+    return {
+        message: "Usuário atualizado com sucesso",
+        usuario: usuarioAtualizado
+    };
 }
 
 async function deletar(id) {
@@ -56,10 +66,41 @@ async function deletar(id) {
     const usuarioDeletado = await userRepository.deletar(id);
 }
 
+async function login(dados) {
+    const dadosValidadosZod = userLoginSchema.parse(dados);
+
+    const usuarioBanco = await userRepository.buscarPorEmail(dadosValidadosZod.email);
+
+    if (!usuarioBanco) throw new AppError("Email ou senha inválidos", 401);
+
+    const senhaValida = await bcrypt.compare(
+        dadosValidadosZod.senha,
+        usuarioBanco.senha
+    );
+
+    if (!senhaValida) throw new AppError("Email ou senha inválidos", 401);
+
+    const token = jwt.sign(
+        {
+            id: usuarioBanco.id,
+            email: usuarioBanco.email
+        },
+        process.env.JWT_SECRET, {
+            expiresIn: "1h"
+        }
+    );
+
+    return {
+        message: "Login realizado com sucesso!",
+        token
+    };
+}
+
 module.exports = {
     criar,
     listar,
     buscarPorId,
     atualizar,
-    deletar
+    deletar,
+    login
 };
